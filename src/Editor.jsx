@@ -54,7 +54,7 @@ const initialConfig = {
   ],
 };
 
-function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText }) {
+function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText, focusEditor }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -90,11 +90,16 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
       });
     };
 
+    const focusEditorHandler = () => {
+      editor.focus();
+    };
+
     onSave.current = saveHandler;
     getCurrentContent.current = getContentHandler;
     clearEditor.current = clearEditorHandler;
     insertText.current = insertTextHandler;
-  }, [editor, onSave, saveCallback, getCurrentContent, clearEditor, insertText]);
+    focusEditor.current = focusEditorHandler;
+  }, [editor, onSave, saveCallback, getCurrentContent, clearEditor, insertText, focusEditor]);
 
   useEffect(() => {
     editor.setEditable(!isSaving);
@@ -110,6 +115,7 @@ export default function Editor() {
   const getCurrentContent = { current: null };
   const clearEditor = { current: null };
   const insertText = { current: null };
+  const focusEditor = { current: null };
 
   const handleDirectGitHubSave = async () => {
     if (isSaving) return; // Prevent multiple saves
@@ -174,21 +180,32 @@ export default function Editor() {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         setIsCommandPaletteOpen(true);
       } else if (e.altKey && e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         handleDirectGitHubSave();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   const handleFileSelect = (linkText) => {
     if (insertText.current) {
       insertText.current(linkText);
     }
+  };
+
+  const handleCommandPaletteClose = () => {
+    setIsCommandPaletteOpen(false);
+    setTimeout(() => {
+      if (focusEditor.current) {
+        focusEditor.current();
+      }
+    }, 100);
   };
 
   const handleSave = () => {
@@ -244,7 +261,7 @@ export default function Editor() {
           <ListPlugin />
           <TabIndentationPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} />
+          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} />
         </div>
       </LexicalComposer>
       <button
@@ -282,7 +299,7 @@ export default function Editor() {
       </button>
       <CommandPalette
         isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
+        onClose={handleCommandPaletteClose}
         onSave={handleSave}
         getCurrentContent={getCurrentContent}
         clearEditor={clearEditor}
