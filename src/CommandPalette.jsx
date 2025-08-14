@@ -215,8 +215,8 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
               </Command.Group>
             )}
 
-            <Command.Group heading="Actions" className="command-group">
-              {githubToken && selectedRepo ? (
+            {githubToken && selectedRepo && (
+              <Command.Group heading="Actions" className="command-group">
                 <Command.Item
                   onSelect={async () => {
                     const content = getCurrentContent?.current ? await getCurrentContent.current() : localStorage.getItem('editorContent') || ''
@@ -227,17 +227,8 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
                 >
                   🚀 Save to GitHub ({selectedRepo}{githubFolder})
                 </Command.Item>
-              ) : (
-                <Command.Item
-                  onSelect={() => {
-                    setShowGitHubConfig(true)
-                  }}
-                  className="command-item"
-                >
-                  ⚙️ Configure GitHub to Save
-                </Command.Item>
-              )}
-            </Command.Group>
+              </Command.Group>
+            )}
             <Command.Group heading="GitHub" className="command-group">
               <Command.Item
                 onSelect={() => {
