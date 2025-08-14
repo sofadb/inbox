@@ -86,20 +86,29 @@ const GitHubConfig = ({ isOpen, onClose, onSave }) => {
         {step === 1 && (
           <div className="github-config-step">
             <div className="step-indicator">
-              <span className="step-number active">1</span>
-              <span className="step-number">2</span>
-              <span className="step-number">3</span>
+              <div className="step-item">
+                <span className="step-number active">1</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number">2</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number">3</span>
+              </div>
             </div>
 
             <h3>Generate Personal Access Token</h3>
             
             <div className="instructions">
-              <p>Follow these steps to create a GitHub Personal Access Token:</p>
+              <p>Follow these steps to create a GitHub Fine-grained Personal Access Token:</p>
               <ol>
-                <li>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">GitHub Settings → Developer settings → Personal access tokens</a></li>
-                <li>Click <strong>"Generate new token (classic)"</strong></li>
+                <li>Go to <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">GitHub Settings → Developer settings → Fine-grained tokens</a></li>
                 <li>Give it a descriptive name (e.g., "Markdown Editor")</li>
-                <li>Select the <strong>"repo"</strong> scope for repository access</li>
+                <li>Set expiration date as desired</li>
+                <li>Select your repository in "Repository access"</li>
+                <li>Under "Repository permissions", grant <strong>"Contents: Write"</strong> access</li>
                 <li>Click <strong>"Generate token"</strong></li>
                 <li>Copy the token and paste it below</li>
               </ol>
@@ -133,9 +142,17 @@ const GitHubConfig = ({ isOpen, onClose, onSave }) => {
         {step === 2 && (
           <div className="github-config-step">
             <div className="step-indicator">
-              <span className="step-number completed">✓</span>
-              <span className="step-number active">2</span>
-              <span className="step-number">3</span>
+              <div className="step-item">
+                <span className="step-number completed">✓</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number active">2</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number">3</span>
+              </div>
             </div>
 
             <h3>Select Repository</h3>
@@ -185,9 +202,17 @@ const GitHubConfig = ({ isOpen, onClose, onSave }) => {
         {step === 3 && (
           <div className="github-config-step">
             <div className="step-indicator">
-              <span className="step-number completed">✓</span>
-              <span className="step-number completed">✓</span>
-              <span className="step-number active">3</span>
+              <div className="step-item">
+                <span className="step-number completed">✓</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number completed">✓</span>
+              </div>
+              <div className="step-connector"></div>
+              <div className="step-item">
+                <span className="step-number active">3</span>
+              </div>
             </div>
 
             <h3>Configure Folder</h3>

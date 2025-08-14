@@ -82,7 +82,12 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 32px;
-  gap: 16px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .step-number {
@@ -97,12 +102,10 @@
   transition: all 0.3s ease;
 }
 
-.step-number:not(:last-child)::after {
-  content: '';
+.step-connector {
   width: 40px;
   height: 2px;
   background: #e5e7eb;
-  margin-left: 16px;
 }
 
 .step-number.active {
@@ -173,12 +176,14 @@ h3 {
 .token-input,
 .folder-input {
   width: 100%;
+  max-width: 100%;
   padding: 12px 16px;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 
 .token-input:focus,
