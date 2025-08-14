@@ -3,12 +3,15 @@ import { Command } from 'cmdk'
 import GitHubConfig from './GitHubConfig'
 import './CommandPalette.css'
 
-const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEditor }) => {
+const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEditor, onLinkFiles, onFileSelect }) => {
   const [search, setSearch] = useState('')
   const [githubToken, setGithubToken] = useState(localStorage.getItem('github_token'))
   const [selectedRepo, setSelectedRepo] = useState(localStorage.getItem('github_repo'))
   const [githubFolder, setGithubFolder] = useState(localStorage.getItem('github_folder') || '/inbox')
   const [showGitHubConfig, setShowGitHubConfig] = useState(false)
+  const [markdownFiles, setMarkdownFiles] = useState([])
+  const [filesLoading, setFilesLoading] = useState(false)
+  const [filesError, setFilesError] = useState('')
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -19,9 +22,98 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
 
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
+      loadMarkdownFiles()
       return () => document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, onClose])
+
+  const loadMarkdownFiles = async () => {
+    if (!githubToken || !selectedRepo) {
+      return
+    }
+
+    setFilesLoading(true)
+    setFilesError('')
+
+    try {
+      const folder = githubFolder.startsWith('/') ? githubFolder.slice(1) : githubFolder
+      const apiUrl = `https://api.github.com/repos/${selectedRepo}/contents/${folder}`
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setFilesError(`Folder '${githubFolder}' not found`)
+        } else {
+          throw new Error(`Failed to fetch files: ${response.statusText}`)
+        }
+        return
+      }
+
+      const data = await response.json()
+      
+      const markdownFiles = data
+        .filter(file => file.type === 'file' && file.name.endsWith('.md'))
+        .map(file => ({
+          name: file.name,
+          path: file.path,
+          downloadUrl: file.download_url
+        }))
+        .sort((a, b) => b.name.localeCompare(a.name))
+
+      // Fetch content preview for each file using GitHub API
+      const filesWithPreview = await Promise.all(
+        markdownFiles.map(async (file) => {
+          try {
+            const contentApiUrl = `https://api.github.com/repos/${selectedRepo}/contents/${file.path}`
+            const contentResponse = await fetch(contentApiUrl, {
+              headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            })
+            
+            if (contentResponse.ok) {
+              const contentData = await contentResponse.json()
+              // Decode base64 content
+              const content = atob(contentData.content)
+              // Get first 100 characters, remove markdown syntax for cleaner preview
+              const preview = content
+                .replace(/^#+\s*/gm, '') // Remove heading markers
+                .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markers
+                .replace(/\*(.*?)\*/g, '$1') // Remove italic markers
+                .replace(/`(.*?)`/g, '$1') // Remove inline code markers
+                .replace(/\n+/g, ' ') // Replace newlines with spaces
+                .trim()
+                .substring(0, 100)
+              return { ...file, preview: preview || 'No content preview available' }
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch preview for ${file.name}:`, error)
+          }
+          return { ...file, preview: 'Preview unavailable' }
+        })
+      )
+
+      setMarkdownFiles(filesWithPreview)
+    } catch (err) {
+      setFilesError(err.message)
+    } finally {
+      setFilesLoading(false)
+    }
+  }
+
+  const handleFileSelect = (file) => {
+    const fileName = file.name.endsWith('.md') ? file.name.slice(0, -3) : file.name
+    const linkText = `[[${fileName}]]`
+    onFileSelect?.(linkText)
+    onClose()
+  }
 
   const handleGitHubConfigSave = (config) => {
     setGithubToken(config.token)
@@ -90,6 +182,39 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
             <Command.Empty className="command-empty">
               No results found.
             </Command.Empty>
+            {githubToken && selectedRepo && markdownFiles.length > 0 && (
+              <Command.Group heading="Link Markdown Files" className="command-group">
+                {markdownFiles.map((file) => (
+                  <Command.Item
+                    key={file.path}
+                    onSelect={() => handleFileSelect(file)}
+                    className="command-item"
+                  >
+                    <div className="file-info">
+                      <div className="file-name">📄 {file.name}</div>
+                      <div className="file-preview">{file.preview}</div>
+                    </div>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+            
+            {githubToken && selectedRepo && filesLoading && (
+              <Command.Group heading="Link Markdown Files" className="command-group">
+                <Command.Item className="command-item loading-item">
+                  Loading files...
+                </Command.Item>
+              </Command.Group>
+            )}
+            
+            {githubToken && selectedRepo && filesError && (
+              <Command.Group heading="Link Markdown Files" className="command-group">
+                <Command.Item className="command-item error-item">
+                  {filesError}
+                </Command.Item>
+              </Command.Group>
+            )}
+
             <Command.Group heading="Actions" className="command-group">
               {githubToken && selectedRepo ? (
                 <Command.Item

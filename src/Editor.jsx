@@ -13,7 +13,7 @@ import { ListItemNode, ListNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
 import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown';
-import { $getRoot } from 'lexical';
+import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
 import CommandPalette from './CommandPalette';
 
 const theme = {
@@ -54,7 +54,7 @@ const initialConfig = {
   ],
 };
 
-function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving }) {
+function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -81,10 +81,20 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
       });
     };
 
+    const insertTextHandler = (text) => {
+      editor.update(() => {
+        const selection = $getSelection();
+        if ($isRangeSelection(selection)) {
+          selection.insertText(text);
+        }
+      });
+    };
+
     onSave.current = saveHandler;
     getCurrentContent.current = getContentHandler;
     clearEditor.current = clearEditorHandler;
-  }, [editor, onSave, saveCallback, getCurrentContent, clearEditor]);
+    insertText.current = insertTextHandler;
+  }, [editor, onSave, saveCallback, getCurrentContent, clearEditor, insertText]);
 
   useEffect(() => {
     editor.setEditable(!isSaving);
@@ -99,6 +109,7 @@ export default function Editor() {
   const saveHandler = { current: null };
   const getCurrentContent = { current: null };
   const clearEditor = { current: null };
+  const insertText = { current: null };
 
   const handleDirectGitHubSave = async () => {
     if (isSaving) return; // Prevent multiple saves
@@ -174,6 +185,12 @@ export default function Editor() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const handleFileSelect = (linkText) => {
+    if (insertText.current) {
+      insertText.current(linkText);
+    }
+  };
+
   const handleSave = () => {
     if (saveHandler.current) {
       saveHandler.current();
@@ -227,7 +244,7 @@ export default function Editor() {
           <ListPlugin />
           <TabIndentationPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} />
+          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} />
         </div>
       </LexicalComposer>
       <CommandPalette
@@ -236,6 +253,7 @@ export default function Editor() {
         onSave={handleSave}
         getCurrentContent={getCurrentContent}
         clearEditor={clearEditor}
+        onFileSelect={handleFileSelect}
       />
     </div>
   );
