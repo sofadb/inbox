@@ -80,8 +80,10 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
             
             if (contentResponse.ok) {
               const contentData = await contentResponse.json()
-              // Decode base64 content
-              const content = atob(contentData.content)
+              // Decode base64 content with proper UTF-8 handling
+              const content = new TextDecoder().decode(
+                Uint8Array.from(atob(contentData.content), c => c.charCodeAt(0))
+              )
               // Get first 100 characters, remove markdown syntax for cleaner preview
               const preview = content
                 .replace(/^#+\s*/gm, '') // Remove heading markers
@@ -147,7 +149,7 @@ const CommandPalette = ({ isOpen, onClose, onSave, getCurrentContent, clearEdito
         },
         body: JSON.stringify({
           message: `Add document ${filename}`,
-          content: btoa(content),
+          content: btoa(new TextEncoder().encode(content).reduce((data, byte) => data + String.fromCharCode(byte), '')),
         })
       })
 

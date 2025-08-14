@@ -155,7 +155,7 @@ export default function Editor() {
           },
           body: JSON.stringify({
             message: `Add document ${filename}`,
-            content: btoa(content),
+            content: btoa(new TextEncoder().encode(content).reduce((data, byte) => data + String.fromCharCode(byte), '')),
           })
         });
 
