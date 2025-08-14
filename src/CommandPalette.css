@@ -1,0 +1,74 @@
+.command-palette-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  z-index: 1000;
+}
+
+.command-palette {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 16px 70px rgba(0, 0, 0, 0.2);
+  width: 640px;
+  max-width: 90vw;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.command-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 16px 20px;
+  font-size: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.command-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.command-empty {
+  padding: 16px 20px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.command-group {
+  padding: 8px 0;
+}
+
+.command-group [cmdk-group-heading] {
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.command-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.command-item:hover,
+.command-item[aria-selected="true"] {
+  background-color: #f3f4f6;
+}
+
+.command-item[aria-selected="true"] {
+  background-color: #3b82f6;
+  color: white;
+}

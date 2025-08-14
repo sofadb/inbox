@@ -16,6 +16,7 @@
     "@lexical/markdown": "^0.34.0",
     "@lexical/react": "^0.34.0",
     "@lexical/rich-text": "^0.34.0",
+    "cmdk": "^1.1.1",
     "lexical": "^0.34.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

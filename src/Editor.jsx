@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -6,11 +7,14 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { $getRoot } from 'lexical';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListItemNode, ListNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
 import { TRANSFORMERS } from '@lexical/markdown';
+import CommandPalette from './CommandPalette';
 
 const theme = {
   paragraph: 'editor-paragraph',
@@ -50,7 +54,52 @@ const initialConfig = {
   ],
 };
 
+function SavePlugin({ onSave, saveCallback }) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const saveHandler = () => {
+      editor.read(() => {
+        const root = $getRoot();
+        const content = root.getTextContent();
+        saveCallback(content);
+      });
+    };
+
+    onSave.current = saveHandler;
+  }, [editor, onSave, saveCallback]);
+
+  return null;
+}
+
 export default function Editor() {
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const saveHandler = { current: null };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSave = () => {
+    if (saveHandler.current) {
+      saveHandler.current();
+    }
+  };
+
+  const handleContentSave = (content) => {
+    console.log('Saving content:', content);
+    localStorage.setItem('editorContent', content);
+    alert('Content saved!');
+  };
+
   return (
     <div className="editor-container">
       <LexicalComposer initialConfig={initialConfig}>
@@ -64,7 +113,7 @@ export default function Editor() {
             }
             placeholder={
               <div className="editor-placeholder">
-                Start writing markdown...
+                Start writing markdown... (Press Ctrl+Enter for command palette)
               </div>
             }
             ErrorBoundary={LexicalErrorBoundary}
@@ -73,8 +122,14 @@ export default function Editor() {
           <ListPlugin />
           <TabIndentationPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} />
         </div>
       </LexicalComposer>
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSave={handleSave}
+      />
     </div>
   );
 }
