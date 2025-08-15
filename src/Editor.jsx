@@ -19,6 +19,8 @@ import { ImageNode } from './ImageNode';
 import ImagePastePlugin from './ImagePastePlugin';
 import { IMAGE_TRANSFORMER } from './imageTransformers';
 import { saveToGitHub } from './githubService';
+import CommandPaletteButton from './CommandPaletteButton';
+import { useCommandPalette } from './useCommandPalette';
 
 
 const CUSTOM_TRANSFORMERS = [
@@ -156,7 +158,6 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
 
 
 export default function Editor() {
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadInitialContent] = useState(true);
   const saveHandler = { current: null };
@@ -180,22 +181,7 @@ export default function Editor() {
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsCommandPaletteOpen(true);
-      } else if (e.altKey && e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        handleDirectGitHubSave();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, []);
+  const { isCommandPaletteOpen, handleCommandPaletteOpen, handleCommandPaletteClose } = useCommandPalette(handleDirectGitHubSave, focusEditor);
 
   const handleFileSelect = (linkText) => {
     if (insertText.current) {
@@ -203,14 +189,6 @@ export default function Editor() {
     }
   };
 
-  const handleCommandPaletteClose = () => {
-    setIsCommandPaletteOpen(false);
-    setTimeout(() => {
-      if (focusEditor.current) {
-        focusEditor.current();
-      }
-    }, 100);
-  };
 
   const handleSave = () => {
     if (saveHandler.current) {
@@ -269,39 +247,7 @@ export default function Editor() {
           <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} loadInitialContent={loadInitialContent} />
         </div>
       </LexicalComposer>
-      <button
-        onClick={() => setIsCommandPaletteOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          backgroundColor: '#667eea',
-          border: 'none',
-          color: 'white',
-          fontSize: '20px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          zIndex: 1000
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.backgroundColor = '#5a67d8';
-          e.target.style.transform = 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.backgroundColor = '#667eea';
-          e.target.style.transform = 'scale(1)';
-        }}
-        title="Open Command Palette (Ctrl+Enter)"
-      >
-        ⌘
-      </button>
+      <CommandPaletteButton onClick={handleCommandPaletteOpen} />
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={handleCommandPaletteClose}
