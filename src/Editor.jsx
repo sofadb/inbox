@@ -12,9 +12,153 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListItemNode, ListNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
-import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown';
-import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
+import { $convertToMarkdownString, ELEMENT_TRANSFORMERS, TEXT_FORMAT_TRANSFORMERS, TEXT_MATCH_TRANSFORMERS } from '@lexical/markdown';
+import { $getRoot, $getSelection, $isRangeSelection, DecoratorNode, $applyNodeReplacement, $insertNodes } from 'lexical';
 import CommandPalette from './CommandPalette';
+
+class ImageNode extends DecoratorNode {
+  constructor(src, altText, width, height, key) {
+    super(key);
+    this.__src = src;
+    this.__altText = altText;
+    this.__width = width || 'inherit';
+    this.__height = height || 'inherit';
+  }
+
+  static getType() {
+    return 'image';
+  }
+
+  static clone(node) {
+    return new ImageNode(
+      node.__src,
+      node.__altText,
+      node.__width,
+      node.__height,
+      node.__key,
+    );
+  }
+
+  static importJSON(serializedNode) {
+    const { altText, height, width, src } = serializedNode;
+    return $createImageNode({
+      altText,
+      height,
+      src,
+      width,
+    });
+  }
+
+  exportJSON() {
+    return {
+      altText: this.getAltText(),
+      height: this.__height === 'inherit' ? 0 : this.__height,
+      src: this.getSrc(),
+      type: 'image',
+      version: 1,
+      width: this.__width === 'inherit' ? 0 : this.__width,
+    };
+  }
+
+  getSrc() {
+    return this.__src;
+  }
+
+  getAltText() {
+    return this.__altText;
+  }
+
+  setAltText(altText) {
+    const writable = this.getWritable();
+    writable.__altText = altText;
+  }
+
+  createDOM() {
+    const element = document.createElement('span');
+    element.style.display = 'inline-block';
+    return element;
+  }
+
+  updateDOM() {
+    return false;
+  }
+
+  decorate() {
+    return (
+      <img
+        src={this.__src}
+        alt={this.__altText}
+        style={{
+          width: this.__width,
+          height: this.__height,
+          maxWidth: '100%',
+          display: 'block',
+          margin: '10px 0',
+        }}
+      />
+    );
+  }
+
+  exportDOM() {
+    const element = document.createElement('img');
+    element.setAttribute('src', this.__src);
+    element.setAttribute('alt', this.__altText);
+    if (this.__width !== 'inherit') {
+      element.setAttribute('width', this.__width.toString());
+    }
+    if (this.__height !== 'inherit') {
+      element.setAttribute('height', this.__height.toString());
+    }
+    return { element };
+  }
+}
+
+function $createImageNode({
+  altText,
+  height,
+  src,
+  width,
+  key,
+}) {
+  return $applyNodeReplacement(
+    new ImageNode(src, altText, width, height, key),
+  );
+}
+
+function $isImageNode(node) {
+  return node instanceof ImageNode;
+}
+
+const IMAGE_TRANSFORMER = {
+  dependencies: [ImageNode],
+  export: (node) => {
+    if (!$isImageNode(node)) {
+      return null;
+    }
+    return `![${node.getAltText()}](${node.getSrc()})`;
+  },
+  importRegExp: /^!\[([^\]]*)\]\(([^)]+)\)$/,
+  regExp: /^!\[([^\]]*)\]\(([^)]+)\)$/,
+  replace: (textNode, match) => {
+    const [, altText, src] = match;
+    const imageNode = $createImageNode({
+      altText,
+      src,
+      width: 'inherit',
+      height: 'inherit',
+    });
+    textNode.replace(imageNode);
+  },
+  trigger: ')',
+  type: 'text-match',
+};
+
+const CUSTOM_TRANSFORMERS = [
+  ...ELEMENT_TRANSFORMERS,
+  ...TEXT_FORMAT_TRANSFORMERS,
+  ...TEXT_MATCH_TRANSFORMERS,
+  IMAGE_TRANSFORMER,
+];
 
 const theme = {
   paragraph: 'editor-paragraph',
@@ -51,6 +195,7 @@ const initialConfig = {
     QuoteNode,
     CodeNode,
     LinkNode,
+    ImageNode,
   ],
 };
 
@@ -60,7 +205,7 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
   useEffect(() => {
     const saveHandler = () => {
       editor.read(() => {
-        const markdown = $convertToMarkdownString(TRANSFORMERS);
+        const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
         saveCallback(markdown);
       });
     };
@@ -68,7 +213,7 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
     const getContentHandler = () => {
       return new Promise((resolve) => {
         editor.read(() => {
-          const markdown = $convertToMarkdownString(TRANSFORMERS);
+          const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
           resolve(markdown);
         });
       });
@@ -104,6 +249,57 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
   useEffect(() => {
     editor.setEditable(!isSaving);
   }, [editor, isSaving]);
+
+  return null;
+}
+
+function ImagePastePlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const handlePaste = (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          event.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataURL = e.target.result;
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              
+              editor.update(() => {
+                const selection = $getSelection();
+                if ($isRangeSelection(selection)) {
+                  const imageNode = $createImageNode({
+                    src: dataURL,
+                    altText: `Pasted image ${timestamp}`,
+                    width: 'inherit',
+                    height: 'inherit',
+                  });
+                  $insertNodes([imageNode]);
+                }
+              });
+            };
+            reader.readAsDataURL(file);
+          }
+          break;
+        }
+      }
+    };
+
+    const editorElement = editor.getRootElement();
+    if (editorElement) {
+      editorElement.addEventListener('paste', handlePaste);
+      return () => {
+        editorElement.removeEventListener('paste', handlePaste);
+      };
+    }
+  }, [editor]);
 
   return null;
 }
@@ -260,7 +456,8 @@ export default function Editor() {
           <HistoryPlugin />
           <ListPlugin />
           <TabIndentationPlugin />
-          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <MarkdownShortcutPlugin transformers={CUSTOM_TRANSFORMERS} />
+          <ImagePastePlugin />
           <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} />
         </div>
       </LexicalComposer>
