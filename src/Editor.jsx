@@ -12,7 +12,7 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListItemNode, ListNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
-import { $convertToMarkdownString, ELEMENT_TRANSFORMERS, TEXT_FORMAT_TRANSFORMERS, TEXT_MATCH_TRANSFORMERS } from '@lexical/markdown';
+import { $convertToMarkdownString, $convertFromMarkdownString, ELEMENT_TRANSFORMERS, TEXT_FORMAT_TRANSFORMERS, TEXT_MATCH_TRANSFORMERS } from '@lexical/markdown';
 import { $getRoot, $getSelection, $isRangeSelection, DecoratorNode, $applyNodeReplacement, $insertNodes } from 'lexical';
 import CommandPalette from './CommandPalette';
 
@@ -199,7 +199,7 @@ const initialConfig = {
   ],
 };
 
-function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText, focusEditor }) {
+function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText, focusEditor, loadInitialContent }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -249,6 +249,39 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
   useEffect(() => {
     editor.setEditable(!isSaving);
   }, [editor, isSaving]);
+
+  useEffect(() => {
+    if (loadInitialContent) {
+      const savedContent = localStorage.getItem('editorContent');
+      if (savedContent && savedContent.trim()) {
+        editor.update(() => {
+          const root = $getRoot();
+          const currentContent = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
+          if (!currentContent.trim()) {
+            root.clear();
+            $convertFromMarkdownString(savedContent, CUSTOM_TRANSFORMERS);
+          }
+        });
+      }
+    }
+  }, [editor, loadInitialContent]);
+
+  useEffect(() => {
+    const autoSave = () => {
+      editor.read(() => {
+        const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
+        if (markdown.trim()) {
+          localStorage.setItem('editorContent', markdown);
+        } else {
+          localStorage.removeItem('editorContent');
+        }
+      });
+    };
+
+    const intervalId = setInterval(autoSave, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [editor]);
 
   return null;
 }
@@ -307,6 +340,7 @@ function ImagePastePlugin() {
 export default function Editor() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadInitialContent] = useState(true);
   const saveHandler = { current: null };
   const getCurrentContent = { current: null };
   const clearEditor = { current: null };
@@ -358,6 +392,7 @@ export default function Editor() {
         if (response.ok) {
           if (clearEditor?.current) {
             clearEditor.current();
+            localStorage.removeItem('editorContent');
           }
         } else {
           const error = await response.json();
@@ -458,7 +493,7 @@ export default function Editor() {
           <TabIndentationPlugin />
           <MarkdownShortcutPlugin transformers={CUSTOM_TRANSFORMERS} />
           <ImagePastePlugin />
-          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} />
+          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} loadInitialContent={loadInitialContent} />
         </div>
       </LexicalComposer>
       <button
