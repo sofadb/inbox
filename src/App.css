@@ -29,7 +29,7 @@
   border: none;
   resize: none;
   overflow-y: auto;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
   background-color: #ffffff;
   color: #333333;
 }
@@ -40,7 +40,7 @@
   left: 20px;
   color: #999;
   font-size: 16px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
   pointer-events: none;
 }
 
