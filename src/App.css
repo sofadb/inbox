@@ -45,25 +45,25 @@
 }
 
 .editor-paragraph {
-  margin: 0 0 12px 0;
+  margin: 0;
 }
 
 .editor-heading-h1 {
   font-size: 2em;
   font-weight: bold;
-  margin: 24px 0 16px 0;
+  margin: 0;
 }
 
 .editor-heading-h2 {
   font-size: 1.5em;
   font-weight: bold;
-  margin: 20px 0 12px 0;
+  margin: 0;
 }
 
 .editor-heading-h3 {
   font-size: 1.25em;
   font-weight: bold;
-  margin: 16px 0 8px 0;
+  margin: 0;
 }
 
 
