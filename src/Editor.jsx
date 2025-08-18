@@ -123,13 +123,32 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
   useEffect(() => {
     if (loadInitialContent) {
       const savedContent = localStorage.getItem('editorContent');
-      if (savedContent && savedContent.trim()) {
+      if (savedContent !== null && savedContent.length > 0) {
         editor.update(() => {
           const root = $getRoot();
-          const currentContent = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
+          const currentContent = root.getTextContent();
           if (!currentContent.trim()) {
-            root.clear();
-            $convertFromMarkdownString(savedContent, CUSTOM_TRANSFORMERS);
+            try {
+              // Try to parse as serialized editor state first
+              const parsedState = JSON.parse(savedContent);
+              const editorState = editor.parseEditorState(parsedState);
+              editor.setEditorState(editorState);
+            } catch (error) {
+              // If JSON parsing fails, try markdown parsing
+              try {
+                root.clear();
+                $convertFromMarkdownString(savedContent, CUSTOM_TRANSFORMERS);
+              } catch (markdownError) {
+                // If both fail, insert as plain text
+                root.clear();
+                const selection = $getSelection();
+                if ($isRangeSelection(selection)) {
+                  selection.insertText(savedContent);
+                } else {
+                  root.selectEnd().insertText(savedContent);
+                }
+              }
+            }
           }
         });
       }
@@ -139,9 +158,11 @@ function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSa
   useEffect(() => {
     const autoSave = () => {
       editor.read(() => {
-        const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
-        if (markdown.trim()) {
-          localStorage.setItem('editorContent', markdown);
+        // Use JSON serialization to preserve exact editor state
+        const editorState = editor.getEditorState();
+        const serializedState = JSON.stringify(editorState.toJSON());
+        if (serializedState && serializedState !== '{"root":{"children":[],"direction":null,"format":"","indent":0,"type":"root","version":1}}') {
+          localStorage.setItem('editorContent', serializedState);
         } else {
           localStorage.removeItem('editorContent');
         }
