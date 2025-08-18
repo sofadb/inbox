@@ -70,6 +70,7 @@
 .editor-list-ul,
 .editor-list-ol {
   padding-left: 30px;
+  margin: 0;
 }
 
 .editor-nested-listitem {
@@ -80,7 +81,7 @@
   border-left: 4px solid #ddd;
   padding: 0 16px;
   color: #666;
-  margin: 12px 0;
+  margin: 0;
 }
 
 .editor-code {
