@@ -1,223 +1,115 @@
-import { useState, useEffect } from 'react';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
-import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
-import { ListPlugin } from '@lexical/react/LexicalListPlugin';
-import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { ListItemNode, ListNode } from '@lexical/list';
-import { CodeNode } from '@lexical/code';
-import { LinkNode } from '@lexical/link';
-import { $convertToMarkdownString, $convertFromMarkdownString, ELEMENT_TRANSFORMERS, TEXT_FORMAT_TRANSFORMERS, TEXT_MATCH_TRANSFORMERS } from '@lexical/markdown';
-import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
+import { useState, useEffect, useRef } from 'react';
+import Editor from '@monaco-editor/react';
 import CommandPalette from './CommandPalette';
-import { ImageNode } from './ImageNode';
-import ImagePastePlugin from './ImagePastePlugin';
-import { IMAGE_TRANSFORMER } from './imageTransformers';
 import { saveToGitHub } from './githubService';
 import CommandPaletteButton from './CommandPaletteButton';
 import { useCommandPalette } from './useCommandPalette';
 
 
-const CUSTOM_TRANSFORMERS = [
-  ...ELEMENT_TRANSFORMERS,
-  ...TEXT_FORMAT_TRANSFORMERS,
-  ...TEXT_MATCH_TRANSFORMERS,
-  IMAGE_TRANSFORMER,
-];
+export default function MonacoEditor() {
+  const [isSaving, setIsSaving] = useState(false);
+  const [content, setContent] = useState('');
+  const editorRef = useRef(null);
+  const monacoRef = useRef(null);
 
-const theme = {
-  paragraph: 'editor-paragraph',
-  heading: {
-    h1: 'editor-heading-h1',
-    h2: 'editor-heading-h2',
-    h3: 'editor-heading-h3',
-  },
-  list: {
-    ul: 'editor-list-ul',
-    ol: 'editor-list-ol',
-    listitem: 'editor-listitem',
-    nested: {
-      listitem: 'editor-nested-listitem',
-    },
-  },
-  quote: 'editor-quote',
-  code: 'editor-code',
-  link: 'editor-link',
-};
-
-function onError(error) {
-  console.error(error);
-}
-
-const initialConfig = {
-  namespace: 'SimpleMarkdownEditor',
-  theme,
-  onError,
-  nodes: [
-    HeadingNode,
-    ListNode,
-    ListItemNode,
-    QuoteNode,
-    CodeNode,
-    LinkNode,
-    ImageNode,
-  ],
-};
-
-function SavePlugin({ onSave, saveCallback, getCurrentContent, clearEditor, isSaving, insertText, focusEditor, loadInitialContent }) {
-  const [editor] = useLexicalComposerContext();
-
+  // Load initial content from localStorage
   useEffect(() => {
-    const saveHandler = () => {
-      editor.read(() => {
-        const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
-        saveCallback(markdown);
-      });
-    };
-
-    const getContentHandler = () => {
-      return new Promise((resolve) => {
-        editor.read(() => {
-          const markdown = $convertToMarkdownString(CUSTOM_TRANSFORMERS);
-          resolve(markdown);
-        });
-      });
-    };
-
-    const clearEditorHandler = () => {
-      editor.update(() => {
-        const root = $getRoot();
-        root.clear();
-      });
-    };
-
-    const insertTextHandler = (text) => {
-      editor.update(() => {
-        const selection = $getSelection();
-        if ($isRangeSelection(selection)) {
-          selection.insertText(text);
+    const savedContent = localStorage.getItem('editorContent');
+    if (savedContent) {
+      // Try to parse as JSON first (old Lexical format)
+      try {
+        const parsed = JSON.parse(savedContent);
+        if (parsed.root) {
+          // It's Lexical format, just clear it and start fresh
+          setContent('');
+        } else {
+          setContent(savedContent);
         }
-      });
-    };
-
-    const focusEditorHandler = () => {
-      editor.focus();
-    };
-
-    onSave.current = saveHandler;
-    getCurrentContent.current = getContentHandler;
-    clearEditor.current = clearEditorHandler;
-    insertText.current = insertTextHandler;
-    focusEditor.current = focusEditorHandler;
-  }, [editor, onSave, saveCallback, getCurrentContent, clearEditor, insertText, focusEditor]);
-
-  useEffect(() => {
-    editor.setEditable(!isSaving);
-  }, [editor, isSaving]);
-
-  useEffect(() => {
-    if (loadInitialContent) {
-      const savedContent = localStorage.getItem('editorContent');
-      if (savedContent !== null && savedContent.length > 0) {
-        editor.update(() => {
-          const root = $getRoot();
-          const currentContent = root.getTextContent();
-          if (!currentContent.trim()) {
-            try {
-              // Try to parse as serialized editor state first
-              const parsedState = JSON.parse(savedContent);
-              const editorState = editor.parseEditorState(parsedState);
-              editor.setEditorState(editorState);
-            } catch (error) {
-              // If JSON parsing fails, try markdown parsing
-              try {
-                root.clear();
-                $convertFromMarkdownString(savedContent, CUSTOM_TRANSFORMERS);
-              } catch (markdownError) {
-                // If both fail, insert as plain text
-                root.clear();
-                const selection = $getSelection();
-                if ($isRangeSelection(selection)) {
-                  selection.insertText(savedContent);
-                } else {
-                  root.selectEnd().insertText(savedContent);
-                }
-              }
-            }
-          }
-        });
+      } catch {
+        // It's plain text/markdown
+        setContent(savedContent);
       }
     }
-  }, [editor, loadInitialContent]);
+  }, []);
 
+  // Auto-save to localStorage
   useEffect(() => {
-    const autoSave = () => {
-      editor.read(() => {
-        // Use JSON serialization to preserve exact editor state
-        const editorState = editor.getEditorState();
-        const serializedState = JSON.stringify(editorState.toJSON());
-        if (serializedState && serializedState !== '{"root":{"children":[],"direction":null,"format":"","indent":0,"type":"root","version":1}}') {
-          localStorage.setItem('editorContent', serializedState);
+    if (content !== null && content !== undefined) {
+      const timeoutId = setTimeout(() => {
+        if (content.trim()) {
+          localStorage.setItem('editorContent', content);
         } else {
           localStorage.removeItem('editorContent');
         }
-      });
-    };
+      }, 1000);
 
-    const intervalId = setInterval(autoSave, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [content]);
 
-    return () => clearInterval(intervalId);
-  }, [editor]);
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    
+    // Focus the editor
+    editor.focus();
+  };
 
-  return null;
-}
+  const handleChange = (value) => {
+    setContent(value || '');
+  };
 
+  const getCurrentContent = useRef(() => {
+    return Promise.resolve(content);
+  });
 
-export default function Editor() {
-  const [isSaving, setIsSaving] = useState(false);
-  const [loadInitialContent] = useState(true);
-  const saveHandler = { current: null };
-  const getCurrentContent = { current: null };
-  const clearEditor = { current: null };
-  const insertText = { current: null };
-  const focusEditor = { current: null };
+  const clearEditor = useRef(() => {
+    setContent('');
+    if (editorRef.current) {
+      editorRef.current.setValue('');
+    }
+  });
+
+  const insertText = useRef((text) => {
+    if (editorRef.current) {
+      const selection = editorRef.current.getSelection();
+      const id = { major: 1, minor: 1 };
+      const op = {
+        identifier: id,
+        range: selection,
+        text: text,
+        forceMoveMarkers: true
+      };
+      editorRef.current.executeEdits('insert-text', [op]);
+      editorRef.current.focus();
+    }
+  });
+
+  const focusEditor = useRef(() => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+  });
 
   const handleDirectGitHubSave = async () => {
-    if (isSaving) return; // Prevent multiple saves
+    if (isSaving) return;
     
-    if (getCurrentContent?.current) {
-      setIsSaving(true);
-      
-      try {
-        const content = await getCurrentContent.current();
-        await saveToGitHub(content, clearEditor?.current);
-      } finally {
-        setIsSaving(false);
-      }
+    setIsSaving(true);
+    
+    try {
+      await saveToGitHub(content, clearEditor.current);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const { isCommandPaletteOpen, handleCommandPaletteOpen, handleCommandPaletteClose } = useCommandPalette(handleDirectGitHubSave, focusEditor);
 
   const handleFileSelect = (linkText) => {
-    if (insertText.current) {
-      insertText.current(linkText);
-    }
+    insertText.current(linkText);
   };
-
 
   const handleSave = () => {
-    if (saveHandler.current) {
-      saveHandler.current();
-    }
-  };
-
-  const handleContentSave = (content) => {
     console.log('Saving content:', content);
     localStorage.setItem('editorContent', content);
     alert('Content saved!');
@@ -225,49 +117,51 @@ export default function Editor() {
 
   return (
     <div className="editor-container">
-      <LexicalComposer initialConfig={initialConfig}>
-        <div className="editor-inner" style={{ position: 'relative' }}>
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable 
-                className="editor-input" 
-                ariaLabel="Write your markdown here..."
-              />
-            }
-            placeholder={
-              <div className="editor-placeholder">
-                {isSaving ? 'Saving...' : 'Start writing markdown... (Ctrl+Enter: command palette, Alt+Enter: save to GitHub)'}
-              </div>
-            }
-            ErrorBoundary={LexicalErrorBoundary}
-          />
-          {isSaving && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#667eea',
-              zIndex: 10
-            }}>
-              Saving...
-            </div>
-          )}
-          <HistoryPlugin />
-          <ListPlugin />
-          <TabIndentationPlugin />
-          <MarkdownShortcutPlugin transformers={CUSTOM_TRANSFORMERS} />
-          <ImagePastePlugin />
-          <SavePlugin onSave={saveHandler} saveCallback={handleContentSave} getCurrentContent={getCurrentContent} clearEditor={clearEditor} isSaving={isSaving} insertText={insertText} focusEditor={focusEditor} loadInitialContent={loadInitialContent} />
-        </div>
-      </LexicalComposer>
+      <div className="editor-inner" style={{ position: 'relative', height: '100vh' }}>
+        {isSaving && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#667eea',
+            zIndex: 10
+          }}>
+            Saving...
+          </div>
+        )}
+        <Editor
+          height="100vh"
+          defaultLanguage="markdown"
+          value={content}
+          onChange={handleChange}
+          onMount={handleEditorDidMount}
+          theme="vs-light"
+          options={{
+            minimap: { enabled: false },
+            fontSize: 16,
+            lineNumbers: 'on',
+            wordWrap: 'on',
+            wrappingIndent: 'same',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            padding: { top: 16, bottom: 16 },
+            readOnly: isSaving,
+            quickSuggestions: false,
+            suggestOnTriggerCharacters: false,
+            acceptSuggestionOnEnter: 'off',
+            tabCompletion: 'off',
+            wordBasedSuggestions: 'off',
+          }}
+        />
+      </div>
       <CommandPaletteButton onClick={handleCommandPaletteOpen} />
       <CommandPalette
         isOpen={isCommandPaletteOpen}
